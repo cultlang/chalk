@@ -1,0 +1,34 @@
+CPPOPTS = select({
+    "@bazel_tools//src/conditions:windows": ["/std:c++23"],
+    "//conditions:default": [
+        "-std=c++23"
+    ],
+})
+
+cc_library(
+    name = "chalk",
+    visibility = ["//visibility:public"],
+    hdrs = glob(["chalk/*"]),
+    copts = CPPOPTS,
+)
+
+cc_test(
+    name = "tests",
+    deps = [":chalk", "@catch//:single_include"],
+    srcs = glob(["tests/**/*.h*", "benchmark/**/*.c*"]),
+    copts = CPPOPTS,
+)
+
+cc_binary(
+    name = "benchmark",
+    srcs = glob(["benchmark/**/*.h*", "benchmark/**/*.c*"]),
+    copts = CPPOPTS,
+    deps = [":chalk", "@benchmark"],
+)
+
+cc_binary(
+    name = "example",
+    srcs = ["dsecs.hpp", "example.cpp"],
+    deps = [":compat"],
+    copts = CPPOPTS,
+)

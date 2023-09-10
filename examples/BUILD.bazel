@@ -1,0 +1,13 @@
+CPPOPTS = select({
+    "@bazel_tools//src/conditions:windows": ["/std:c++23"],
+    "//conditions:default": [
+        "-std=c++23"
+    ],
+})
+
+cc_binary(
+    name = "basic",
+    srcs = ["basic.cpp"],
+    deps = ["//:chalk"],
+    copts = CPPOPTS,
+)
