@@ -6,15 +6,23 @@
 
 #include "chalk.hpp"
 
-namespace chalk
+namespace chalk::reflection
 {
+    class CoreTypeReflection
+    {
+        std::string userName;
+        std::string typeName;
+        size_t size;
+    };
+
     template<typename TClass, typename TMem>
     union ptrmem_cast {
         TMem TClass::*ptr;
         uintptr_t utr;
     };
 
-    class SimpleReflection {
+    class SimpleReflection
+    {
         public:
             struct Entry {
                 enum Kind {
@@ -39,23 +47,26 @@ namespace chalk
             std::vector<Entry> entries;
     };
 
-    template<typename T>
-    class RuntimeReflector
-            : public ReflectorBase<RuntimeReflector<T>> 
-        {
-            SimpleReflection result;
+    template<typename TLinee, typename TMirror>
+    class ReflectionOutliner
+        : public OutlinerBase<ReflectionOutliner<TLinee, TMirror>> 
+    {
         public:
-            using Reflectee = T;
+            using ReflectionResult = typename TMirror::ReflectionResult;
+            using Linee = TLinee;
+        private:
+            ReflectionResult _result;
+
         public:
             class EntryBuilder
-                : public ReflectorBase<EntryBuilder>
+                : public OutlinerBase<EntryBuilder>
             {
                     bool _final;
                 public:
-                    RuntimeReflector& parent;
-                    SimpleReflection::Entry entry;
+                    ReflectionOutliner& parent;
+                    ReflectionResult::Entry entry;
 
-                    EntryBuilder(RuntimeReflector& parent, SimpleReflection::Entry::Kind kind)
+                    EntryBuilder(ReflectionOutliner& parent, ReflectionResult::Entry::Kind kind)
                         : _final(true), parent(parent), entry(kind)
                         { }
                     EntryBuilder(EntryBuilder const& old_self) = delete;
@@ -88,48 +99,77 @@ namespace chalk
                         return std::move(*this);
                     };
 
-                    constexpr auto operator% (name n) {
+                    constexpr auto operator% (tags::name n) {
                         entry.name = n.value;
                         return std::move(*this);
                     };
             };
         public:
-            RuntimeReflector() {
-                result.type_name = typeid(T).name();
+            ReflectionOutliner() {
+                _result.type_name = typeid(TLinee).name();
             }
 
-            using Result = std::shared_ptr<SimpleReflection>;
+            using Result = std::shared_ptr<ReflectionResult>;
 
-            constexpr auto reify() { return std::make_shared<SimpleReflection>(result); }
+            constexpr auto reify() { return std::make_shared<ReflectionResult>(_result); }
 
             // using "ignore unknown"
-            using ReflectorBase<RuntimeReflector<T>>::operator%;
+            using OutlinerBase<ReflectionOutliner<TLinee, TMirror>>::operator%;
 
             constexpr auto& operator% (name n) {
-                result.name = n.value;
+                _result.name = n.value;
                 return *this;
             };
 
             template<typename TBase>
             constexpr auto& operator% (base<TBase> b) {
-                *this = TBase::reflect(*this);
+                outline<TBase>(this);
                 return *this;
             };
 
             template<typename TBase, typename FRet, typename... FArgs>
-                requires std::is_base_of_v<TBase, T>
-            constexpr auto operator% (func<TBase, FRet, FArgs...> f) {
-                return EntryBuilder(*this, SimpleReflection::Entry::Function)
+                requires std::is_base_of_v<TBase, TLinee> || std::is_same_v<TBase, TLinee>
+            constexpr auto operator% (tags::func<TBase, FRet, FArgs...> f) {
+                return EntryBuilder(*this, ReflectionResult::Entry::Function)
                     .template with_type<decltype(f.value)>()
                     .template with_ptr(ptrmem_cast {f.value}.utr);
             };
 
             template<typename TBase, typename TMem>
-                requires std::is_base_of_v<TBase, T>
-            constexpr auto operator% (mem<TBase, TMem> m) {
-                return EntryBuilder(*this, SimpleReflection::Entry::Member)
+                requires std::is_base_of_v<TBase, TLinee> || std::is_same_v<TBase, TLinee>
+            constexpr auto operator% (tags::mem<TBase, TMem> m) {
+                return EntryBuilder(*this, ReflectionResult::Entry::Member)
                     .template with_type<TMem>()
                     .template with_ptr(ptrmem_cast {m.value}.utr);
             };
+    };
+
+    class Repository
+    {
+        public:
+            template<typename T>
+            using Outliner = ReflectionOutliner<T, Mirror>;
+        private:
+            std::shared_ptr<Repository> _meta;
+            std::shared_ptr<Repository> _supplemental;
+
+            struct Entry {
+
+            };
+
+            std::vector<Entry> _primary;
+            std::vector<Entry> _secondary;
+            
+        public:
+            template<typename T>
+            void outline() {
+                auto reflection = outline<T, Outliner>();
+            };
+    };
+
+    class Mirror
+    {
+        public:
+            using ReflectionResult = SimpleReflection;
     };
 }

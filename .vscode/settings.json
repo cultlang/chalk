@@ -114,6 +114,7 @@
         "*.h++": "cpp",
         "*.rh": "cpp",
         "span": "cpp",
-        "any": "cpp"
+        "any": "cpp",
+        "numbers": "cpp"
     }
 }
